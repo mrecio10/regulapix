@@ -1,0 +1,39 @@
+name: Atualizar Normas do Pix
+
+on:
+  schedule:
+    - cron: '0 9 * * *'   # Todo dia às 9h UTC = 6h horário de Brasília
+  workflow_dispatch:       # Permite disparar manualmente pelo GitHub
+
+permissions:
+  contents: write          # Necessário para commitar o HTML atualizado
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependências
+        run: pip install anthropic
+
+      - name: Verificar e injetar novas normas
+        run: python update_norms.py
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Commitar e publicar se houver mudanças
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add regulapix.html
+          git diff --staged --quiet \
+            && echo "Sem mudanças para commitar." \
+            || (git commit -m "🔄 Normas atualizadas $(date +'%d/%m/%Y')" && git push)
