@@ -50,7 +50,7 @@ a.leaf-link:focus rect { fill-opacity: .3 !important; stroke-width: 2 !important
 }
 .root-pulse { transform-origin: center; animation: pulse 2.8s ease-in-out infinite; }
 
-/* ── Barra de status de atualização ── */
+/* ── Barra de status (somente leitura) ── */
 #updateBar {
   position: fixed;
   bottom: 0; left: 0; right: 0;
@@ -59,127 +59,20 @@ a.leaf-link:focus rect { fill-opacity: .3 !important; stroke-width: 2 !important
   padding: 8px 16px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: center;
   font-size: .75rem;
   color: #4a7a8a;
   z-index: 30;
 }
-#updateBar[hidden] { display: none; }
-#updateStatus { display: flex; align-items: center; gap: 7px; }
-#updateBar button {
-  background: none;
-  border: 1px solid #1a3a4a;
-  color: #4a7a8a;
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-size: .7rem;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: border-color .15s, color .15s;
-}
-#updateBar button:hover { border-color: #00C853; color: #00e676; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.spin { display: inline-block; animation: spin .9s linear infinite; }
-
-/* ── Modal de configuração da chave API ── */
-#apiModal {
-  position: fixed; inset: 0;
-  background: rgba(6,16,28,.85);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 100;
-}
-#apiModal[hidden] { display: none; }
-#apiModal .box {
-  background: #0b1c2c;
-  border: 1px solid #00C853;
-  border-radius: 12px;
-  padding: 28px 28px 22px;
-  width: min(480px, calc(100% - 32px));
-  box-shadow: 0 16px 48px rgba(0,0,0,.6);
-}
-#apiModal h2 { color: #00e676; font-size: .95rem; margin-bottom: 10px; }
-#apiModal p  { color: #8ab4c0; font-size: .78rem; line-height: 1.55; margin-bottom: 14px; }
-#apiModal a  { color: #00C853; }
-#apiModal input {
-  width: 100%;
-  background: #06101c;
-  border: 1px solid #1a3a4a;
-  border-radius: 7px;
-  color: #b9f6ca;
-  font-size: .8rem;
-  font-family: monospace;
-  padding: 9px 11px;
-  margin-bottom: 14px;
-}
-#apiModal .row { display: flex; gap: 8px; justify-content: flex-end; }
-#apiModal .btn-save {
-  background: #00C853; color: #06101c;
-  border: none; border-radius: 7px;
-  padding: 8px 18px; font-size: .8rem;
-  font-weight: 700; cursor: pointer;
-}
-#apiModal .btn-skip {
-  background: none; color: #4a7a8a;
-  border: 1px solid #1a3a4a; border-radius: 7px;
-  padding: 8px 14px; font-size: .8rem; cursor: pointer;
-}
-
-/* ── Toast de novas normas ── */
-#newNormsToast {
-  position: fixed; top: 60px; left: 50%;
-  transform: translateX(-50%);
-  background: #0b2c1a;
-  border: 1px solid #00C853;
-  border-radius: 10px;
-  padding: 12px 18px;
-  color: #b9f6ca;
-  font-size: .78rem;
-  z-index: 50;
-  max-width: 420px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.5);
-}
-#newNormsToast[hidden] { display: none; }
-#newNormsToast .close { float: right; cursor: pointer; color: #4a7a8a; margin-left: 12px; }
 </style>
 </head>
 <body>
 <h1>💸 RegulaPix</h1>
 <p class="sub">Clique nos ramos coloridos para expandir / recolher · folhas com 🔗 abrem a norma oficial em nova aba</p>
 
-<!-- Modal de configuração da chave API -->
-<div id="apiModal" hidden>
-  <div class="box">
-    <h2>🔑 Atualizações automáticas</h2>
-    <p>
-      Insira sua chave da API do Claude para que o mapa mental verifique
-      automaticamente novas normas do BCB uma vez por dia.<br><br>
-      Sua chave fica salva <strong>apenas no seu navegador</strong> (localStorage)
-      e nunca é enviada a nenhum servidor além da API da Anthropic.<br><br>
-      Não tem chave? Crie em
-      <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
-    </p>
-    <input id="apiKeyInput" type="password" placeholder="sk-ant-…" autocomplete="off"/>
-    <div class="row">
-      <button class="btn-skip" onclick="closeApiModal(true)">Pular por agora</button>
-      <button class="btn-save" onclick="saveApiKey()">Salvar e verificar</button>
-    </div>
-  </div>
-</div>
-
-<!-- Toast de novas normas encontradas -->
-<div id="newNormsToast" hidden>
-  <span class="close" onclick="document.getElementById('newNormsToast').hidden=true">✕</span>
-  <span id="newNormsMsg"></span>
-</div>
-
-<!-- Barra de status na parte inferior -->
+<!-- Barra de status (somente leitura — atualização é feita pelo GitHub Actions) -->
 <div id="updateBar">
-  <span id="updateStatus">⚪ Atualizações automáticas</span>
-  <span style="display:flex;gap:8px">
-    <button onclick="openApiModal()">🔑 Chave API</button>
-    <button onclick="checkNow()">🔄 Verificar agora</button>
-  </span>
+  <span id="updateStatus">🔄 Atualizado automaticamente via GitHub Actions</span>
 </div>
 
 <div id="wrap"></div>
@@ -530,30 +423,14 @@ function leafUrl(l)  { return typeof l === 'string' ? null : (l.url || null); }
 draw();
 
 // ═══════════════════════════════════════════════════════════════
-//  ATUALIZAÇÃO AUTOMÁTICA VIA API DO CLAUDE
+//  ATUALIZAÇÃO AUTOMÁTICA — GitHub Actions
+//  Este HTML é atualizado automaticamente, 1x por dia, por um
+//  workflow no GitHub que consulta a API do Claude com busca web
+//  e injeta as novas normas diretamente no bloco AUTO_NORMS abaixo.
+//  Nada disso é executado no navegador do visitante.
 // ═══════════════════════════════════════════════════════════════
 
-const STORAGE = {
-  KEY:        'pixmap_apikey',
-  LAST_CHECK: 'pixmap_lastCheck',
-  EXTRA:      'pixmap_extraLeaves',   // [{branchId, leaf:{t,url}}]
-  SKIPPED:    'pixmap_skipSetup',
-};
-
-// ── Chave padrão embutida (opcional) ────────────────────────
-// Preencha com a sua chave para que colegas não precisem
-// configurar nada. Defina um limite de gasto em:
-// console.anthropic.com/settings/limits
-const DEFAULT_API_KEY = ''; // substitua por: 'sk-ant-api03-...'
-
-// Retorna a chave ativa: localStorage tem prioridade, depois a padrão embutida
-function getApiKey() {
-  return localStorage.getItem(STORAGE.KEY) || DEFAULT_API_KEY || null;
-}
-
-const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 h
-
-// Normas já presentes no mapa (para não repetir nas buscas)
+// Normas já presentes no mapa (usado pelo script Python para não repetir buscas)
 const CURRENT_NORMS = [
   'Lei 12865/2013','Lei 14286/2021',
   'Res BCB 1/2020','Res BCB 19/2020','Res BCB 80/2021','Res BCB 103/2021',
@@ -565,199 +442,11 @@ const CURRENT_NORMS = [
   'IN BCB 199/2021','IN BCB 491/2024','IN BCB 511/2024','IN BCB 512/2024','IN BCB 633/2025',
 ];
 
-// ── UI helpers ───────────────────────────────────────────────
-function setStatus(icon, text, color) {
-  const el = document.getElementById('updateStatus');
-  el.innerHTML = `<span>${icon}</span><span style="color:${color||'#4a7a8a'}">${text}</span>`;
-}
-
-function showToast(msg) {
-  document.getElementById('newNormsMsg').innerHTML = msg;
-  document.getElementById('newNormsToast').hidden = false;
-  setTimeout(() => { document.getElementById('newNormsToast').hidden = true; }, 12000);
-}
-
-function fmtDate(ts) {
-  return new Date(ts).toLocaleString('pt-BR', {
-    day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'
-  });
-}
-
-// ── API key modal ────────────────────────────────────────────
-function openApiModal() {
-  const stored = localStorage.getItem(STORAGE.KEY) || '';
-  document.getElementById('apiKeyInput').value = stored ? '••••••' : '';
-  document.getElementById('apiModal').hidden = false;
-}
-function closeApiModal(skip) {
-  document.getElementById('apiModal').hidden = true;
-  if (skip) localStorage.setItem(STORAGE.SKIPPED, '1');
-}
-function saveApiKey() {
-  const val = document.getElementById('apiKeyInput').value.trim();
-  if (!val || val === '••••••') { closeApiModal(false); return; }
-  if (!val.startsWith('sk-ant-')) {
-    alert('A chave deve começar com "sk-ant-"'); return;
-  }
-  localStorage.setItem(STORAGE.KEY, val);
-  localStorage.removeItem(STORAGE.SKIPPED);
-  closeApiModal(false);
-  checkForUpdates(val);
-}
-
-// ── Aplicar folhas extras salvas de buscas anteriores ────────
-function applyStoredExtras() {
-  const raw = localStorage.getItem(STORAGE.EXTRA);
-  if (!raw) return;
-  try {
-    const extras = JSON.parse(raw);
-    extras.forEach(({ branchId, leaf }) => {
-      const branch = BRANCHES.find(b => b.id === branchId);
-      if (!branch) return;
-      // trunca textos salvos antes da correção de layout
-      leaf.t = fitLeafText(leaf.t);
-      const dup = branch.leaves.some(l => leafText(l) === leaf.t);
-      if (!dup) {
-        branch.leaves.push(leaf);
-        state[branchId] = true; // expandir ramo com norma adicionada
-      }
-    });
-  } catch(e) { localStorage.removeItem(STORAGE.EXTRA); }
-}
-
 // Trunca texto para caber dentro da caixa (270px útil, ~41 chars com 🔗)
 function fitLeafText(txt) {
   const MAX_CHARS = 41;
   if (txt.length <= MAX_CHARS) return txt;
   return txt.slice(0, MAX_CHARS - 1).trimEnd() + '…';
-}
-
-// ── Merge de novas normas retornadas pela API ────────────────
-function mergeNewNorms(newNorms) {
-  if (!newNorms || !newNorms.length) return 0;
-  const raw = localStorage.getItem(STORAGE.EXTRA);
-  const extras = raw ? JSON.parse(raw) : [];
-  let added = 0;
-  const expandedBranches = new Set();
-
-  newNorms.forEach(n => {
-    const tipo = n.tipo || 'Resolução BCB';
-    const url  = bcbNorm(tipo, n.numero);
-    const leaf = { t: fitLeafText(n.leafText), url };
-    const branchId = n.branch || 'legal';
-
-    const branch = BRANCHES.find(b => b.id === branchId);
-    if (!branch) return;
-    if (branch.leaves.some(l => leafText(l) === leaf.t)) return; // duplicata
-
-    branch.leaves.push(leaf);
-    extras.push({ branchId, leaf });
-    expandedBranches.add(branchId); // marcar para expandir
-
-    // Adicionar à Base Legal também, se ainda não estiver lá
-    if (branchId !== 'legal') {
-      const legal = BRANCHES.find(b => b.id === 'legal');
-      if (legal && !legal.leaves.some(l => leafText(l) === leaf.t)) {
-        legal.leaves.push(leaf);
-        extras.push({ branchId: 'legal', leaf });
-        expandedBranches.add('legal');
-      }
-    }
-    added++;
-  });
-
-  if (added > 0) {
-    localStorage.setItem(STORAGE.EXTRA, JSON.stringify(extras));
-    // Expandir os ramos que receberam novas folhas para o usuário as ver
-    expandedBranches.forEach(id => { state[id] = true; });
-    draw();
-  }
-  return added;
-}
-
-// ── Chamada à API do Claude com web_search ───────────────────
-async function checkForUpdates(apiKey) {
-  setStatus('<span class="spin">🔄</span>', 'Verificando novas normas do BCB…', '#FFD54F');
-
-  const prompt = `Pesquise na web se existem NOVAS resoluções, circulares ou instruções normativas do Banco Central do Brasil (BCB) sobre o Pix publicadas após abril de 2026.
-
-Normas já incluídas no mapa (não repetir): ${CURRENT_NORMS.join(', ')}.
-
-Retorne APENAS JSON válido, sem markdown, sem explicação extra, com esta estrutura exata:
-{
-  "newNorms": [
-    {
-      "tipo": "Resolução BCB",
-      "numero": 560,
-      "leafText": "Res. BCB nº 560/2026 — descrição concisa",
-      "branch": "seguranca"
-    }
-  ],
-  "summary": "mensagem resumida"
-}
-
-Opções de branch: legal, spi, participantes, chaves, modalidades, limites, seguranca, tarifas.
-Se não houver normas novas, retorne: { "newNorms": [], "summary": "Nenhuma norma nova encontrada." }`;
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        system: 'Você é especialista em regulamentação brasileira do Pix. Responda APENAS com JSON válido, sem markdown, sem texto adicional.',
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `HTTP ${res.status}`);
-    }
-
-    const data = await res.json();
-    const text = (data.content || [])
-      .filter(b => b.type === 'text')
-      .map(b => b.text)
-      .join('');
-
-    const clean = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
-
-    const now = Date.now();
-    localStorage.setItem(STORAGE.LAST_CHECK, String(now));
-
-    const added = mergeNewNorms(parsed.newNorms || []);
-
-    if (added > 0) {
-      setStatus('🟢', `${added} nova(s) norma(s) adicionada(s) — ${fmtDate(now)}`, '#00e676');
-      showToast(`✅ <strong>${added} nova(s) norma(s)</strong> adicionada(s): ${(parsed.newNorms||[]).map(n=>n.leafText).join(' | ')}`);
-    } else {
-      setStatus('✅', `Sem novidades — verificado em ${fmtDate(now)}`, '#4a7a8a');
-    }
-
-  } catch(e) {
-    console.error('Erro na verificação de normas:', e);
-    const msg = String(e.message).includes('401') ? 'Chave API inválida — clique em 🔑' :
-                String(e.message).includes('429') ? 'Limite de requisições atingido' :
-                'Erro na verificação — tente novamente';
-    setStatus('⚠️', msg, '#EF5350');
-  }
-}
-
-// ── Botão "Verificar agora" ──────────────────────────────────
-function checkNow() {
-  const key = getApiKey();
-  if (!key) { openApiModal(); return; }
-  localStorage.removeItem(STORAGE.LAST_CHECK);
-  checkForUpdates(key);
 }
 
 // ── Normas adicionadas pelo GitHub Actions (não editar manualmente) ──
@@ -766,6 +455,9 @@ const AUTO_NORMS = [
 // __AUTO_NORMS_END__
 ];
 
+// Data da última injeção automática (atualizada pelo script Python)
+const LAST_AUTO_UPDATE = ''; // __LAST_UPDATE__
+
 function applyAutoNorms() {
   AUTO_NORMS.forEach(n => {
     if (!n || !n.tipo || !n.numero || !n.leafText || !n.branch) return;
@@ -773,35 +465,30 @@ function applyAutoNorms() {
     const leaf = { t: fitLeafText(n.leafText), url };
     const branch = BRANCHES.find(b => b.id === n.branch);
     if (!branch) return;
-    if (!branch.leaves.some(l => leafText(l) === leaf.t)) branch.leaves.push(leaf);
+    if (!branch.leaves.some(l => leafText(l) === leaf.t)) {
+      branch.leaves.push(leaf);
+      state[n.branch] = true; // expande o ramo para mostrar a novidade
+    }
     if (n.branch !== 'legal') {
       const legal = BRANCHES.find(b => b.id === 'legal');
-      if (legal && !legal.leaves.some(l => leafText(l) === leaf.t)) legal.leaves.push(leaf);
+      if (legal && !legal.leaves.some(l => leafText(l) === leaf.t)) {
+        legal.leaves.push(leaf);
+        state['legal'] = true;
+      }
     }
   });
 }
 
 // ── Inicialização ────────────────────────────────────────────
 (function init() {
-  applyAutoNorms();      // normas injetadas pelo GitHub Actions
-  applyStoredExtras();   // aplica normas já salvas de dias anteriores
-  draw();                // re-renderiza com as extras
+  applyAutoNorms();
+  draw();
 
-  const key       = getApiKey();
-  const lastCheck = localStorage.getItem(STORAGE.LAST_CHECK);
-  const skipped   = localStorage.getItem(STORAGE.SKIPPED);
-
-  if (key) {
-    const needsCheck = !lastCheck || Date.now() - parseInt(lastCheck) > CHECK_INTERVAL_MS;
-    if (needsCheck) {
-      checkForUpdates(key);
-    } else {
-      setStatus('✅', `Verificado em ${fmtDate(parseInt(lastCheck))}`, '#4a7a8a');
-    }
-  } else if (!skipped) {
-    setTimeout(openApiModal, 900); // mostra modal se não há chave embutida nem salva
-  } else {
-    setStatus('⚪', 'Clique em 🔑 para ativar atualizações automáticas', '#4a7a8a');
+  const statusEl = document.getElementById('updateStatus');
+  if (statusEl) {
+    statusEl.textContent = LAST_AUTO_UPDATE
+      ? `🔄 Última atualização automática: ${LAST_AUTO_UPDATE}`
+      : '🔄 Atualizado automaticamente via GitHub Actions';
   }
 })();
 </script>
