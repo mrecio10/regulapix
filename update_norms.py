@@ -90,7 +90,11 @@ def main():
         max_tokens=1000,
         system=(
             'Você é especialista em regulamentação brasileira do Pix. '
-            'Responda APENAS com JSON válido, sem markdown, sem texto adicional.'
+            'Sua resposta final deve conter SOMENTE o objeto JSON, começando '
+            'diretamente com "{" e terminando com "}". '
+            'NUNCA escreva nenhuma frase, explicação ou observação antes ou '
+            'depois do JSON — nem mesmo uma linha dizendo qual norma você encontrou. '
+            'Não use markdown nem blocos de código.'
         ),
         tools=[{'type': 'web_search_20250305', 'name': 'web_search'}],
         messages=[{'role': 'user', 'content': prompt}],
@@ -98,6 +102,13 @@ def main():
 
     text = ''.join(getattr(b, 'text', '') for b in response.content)
     text = re.sub(r'```json|```', '', text).strip()
+
+    # A API às vezes adiciona uma frase explicativa antes do JSON,
+    # mesmo quando instruída a responder só com JSON. Extraímos apenas
+    # o trecho entre a primeira "{" e a última "}" para ser tolerante a isso.
+    json_match = re.search(r'\{.*\}', text, re.DOTALL)
+    if json_match:
+        text = json_match.group(0)
 
     try:
         data = json.loads(text)
