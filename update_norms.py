@@ -151,7 +151,15 @@ def main():
         flags=re.DOTALL,
     )
 
-    # ── 7. Salvar HTML atualizado ─────────────────────────────
+    # ── 7. Atualizar data da última atualização automática ────
+    today_str = date.today().strftime('%d/%m/%Y')
+    html = re.sub(
+        r"const LAST_AUTO_UPDATE = '[^']*';.*",
+        f"const LAST_AUTO_UPDATE = '{today_str}'; // __LAST_UPDATE__",
+        html,
+    )
+
+    # ── 8. Salvar HTML atualizado ──────────────────────────────
     with open(HTML_FILE, 'w', encoding='utf-8') as f:
         f.write(html)
 
