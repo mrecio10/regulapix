@@ -124,13 +124,28 @@ def main():
         sys.exit(0)
 
     # ── 5. Mesclar novas normas com as existentes ─────────────
-    existing_texts = {n['leafText'] for n in existing_auto}
+    # Normaliza texto removendo "…" final — evita duplicatas quando
+    # um texto é completo e outro é truncado (ex: "IN BCB 746/2026 — limites Pix aproximação"
+    # vs "IN BCB 746/2026 — limites Pix aproxima…")
+    def norm_text(s):
+        return s.replace('…', '').strip().lower()
+
+    existing_norms_set = [(n['leafText'], norm_text(n['leafText'])) for n in existing_auto]
+
+    def is_duplicate(new_text):
+        nt = norm_text(new_text)
+        for _, en in existing_norms_set:
+            if nt == en or nt.startswith(en) or en.startswith(nt):
+                return True
+        # Verificar também em CURRENT_NORMS e BRANCHES do HTML
+        return norm_text(new_text)[:30] in html.lower()
+
     added = []
     for norm in new_norms:
         norm['leafText'] = fit_leaf_text(norm['leafText'])
-        if norm['leafText'] not in existing_texts:
+        if not is_duplicate(norm['leafText']):
             existing_auto.append(norm)
-            existing_texts.add(norm['leafText'])
+            existing_norms_set.append((norm['leafText'], norm_text(norm['leafText'])))
             added.append(norm)
 
             # Adicionar referência em CURRENT_NORMS para evitar repetição futura
