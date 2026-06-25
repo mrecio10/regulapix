@@ -420,6 +420,14 @@ function escHtml(t) {
 function leafText(l) { return typeof l === 'string' ? l : l.t; }
 function leafUrl(l)  { return typeof l === 'string' ? null : (l.url || null); }
 
+// Compara dois textos de folha ignorando truncagem com "…" e maiúsculas/minúsculas.
+// Resolve duplicatas onde um texto é truncado e o outro é completo.
+function sameLeaf(a, b) {
+  const norm = s => s.replace(/…$/, '').trim().toLowerCase();
+  const na = norm(a), nb = norm(b);
+  return na === nb || na.startsWith(nb) || nb.startsWith(na);
+}
+
 draw();
 
 // ═══════════════════════════════════════════════════════════════
@@ -432,14 +440,6 @@ draw();
 
 // Normas já presentes no mapa (usado pelo script Python para não repetir buscas)
 const CURRENT_NORMS = [
-  'IN BCB 740/2026',
-  'Res BCB 561/2026',
-  'Lei Federal 15397/2026',
-  'Res BCB 546/2026',
-  'IN BCB 742/2026',
-  'IN BCB 748/2026',
-  'IN BCB 746/2026',
-  'IN BCB 722/2026',
   'Lei 12865/2013','Lei 14286/2021',
   'Res BCB 1/2020','Res BCB 19/2020','Res BCB 80/2021','Res BCB 103/2021',
   'Res BCB 135/2021','Res BCB 142/2021','Res BCB 147/2021','Res BCB 360/2023',
@@ -460,26 +460,11 @@ function fitLeafText(txt) {
 // ── Normas adicionadas pelo GitHub Actions (não editar manualmente) ──
 const AUTO_NORMS = [
 // __AUTO_NORMS_START__
-  {"tipo": "Instrução Normativa BCB", "numero": 722, "leafText": "IN BCB 722/2026 — Manual DICT v8.2", "branch": "chaves"},
-  {"tipo": "Instrução Normativa BCB", "numero": 746, "leafText": "IN BCB 746/2026 — Limites Pix Aprox/JSR", "branch": "limites"},
-  {"tipo": "Instrução Normativa BCB", "numero": 748, "leafText": "IN BCB 748/2026 — Verif. capital partici…", "branch": "participantes"},
-  {"tipo": "Instrução Normativa BCB", "numero": 742, "leafText": "IN BCB 742/2026 — DICT v8.3", "branch": "chaves"},
-  {"tipo": "Resolução BCB", "numero": 546, "leafText": "Res. BCB 546/2026 — Suspensão processo P…", "branch": "seguranca"},
-  {"tipo": "Resolução BCB", "numero": 559, "leafText": "Res. BCB 559/2026 — Exclusão/auditoria P…", "branch": "participantes"},
-  {"tipo": "Lei Federal", "numero": 15397, "leafText": "Lei 15.397/2026 — conta laranja/fraude d…", "branch": "legal"},
-  {"tipo": "Resolução BCB", "numero": 561, "leafText": "Res. BCB 561/2026 — aprimora regras eFX", "branch": "spi"},
-  {"tipo": "Instrução Normativa BCB", "numero": 746, "leafText": "IN BCB 746/2026 — limites Pix aproximação", "branch": "limites"},
-  {"tipo": "Instrução Normativa BCB", "numero": 746, "leafText": "IN BCB 746/2026 — limites Pix aproximaçã…", "branch": "limites"},
-  {"tipo": "Instrução Normativa BCB", "numero": 748, "leafText": "IN BCB 748/2026 — capital mínimo partici…", "branch": "participantes"},
-  {"tipo": "Resolução BCB", "numero": 559, "leafText": "Res. BCB 559/2026 — controles e exclusão…", "branch": "participantes"},
-  {"tipo": "IN BCB", "numero": 748, "leafText": "IN BCB 748/2026 — verificação capital Pix", "branch": "participantes"},
-  {"tipo": "Instrução Normativa BCB", "numero": 740, "leafText": "IN BCB 740 — testes jornada otimizada", "branch": "spi"},
-  {"tipo": "Instrução Normativa BCB", "numero": 742, "leafText": "IN BCB 742 — DICT Manual v8.3", "branch": "chaves"},
 // __AUTO_NORMS_END__
 ];
 
 // Data da última injeção automática (atualizada pelo script Python)
-const LAST_AUTO_UPDATE = '25/06/2026'; // __LAST_UPDATE__
+const LAST_AUTO_UPDATE = ''; // __LAST_UPDATE__
 
 function applyAutoNorms() {
   AUTO_NORMS.forEach(n => {
@@ -488,13 +473,13 @@ function applyAutoNorms() {
     const leaf = { t: fitLeafText(n.leafText), url };
     const branch = BRANCHES.find(b => b.id === n.branch);
     if (!branch) return;
-    if (!branch.leaves.some(l => leafText(l) === leaf.t)) {
+    if (!branch.leaves.some(l => sameLeaf(leafText(l), leaf.t))) {
       branch.leaves.push(leaf);
       state[n.branch] = true; // expande o ramo para mostrar a novidade
     }
     if (n.branch !== 'legal') {
       const legal = BRANCHES.find(b => b.id === 'legal');
-      if (legal && !legal.leaves.some(l => leafText(l) === leaf.t)) {
+      if (legal && !legal.leaves.some(l => sameLeaf(leafText(l), leaf.t))) {
         legal.leaves.push(leaf);
         state['legal'] = true;
       }
