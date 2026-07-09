@@ -485,11 +485,13 @@ const AUTO_NORMS = [
   {"tipo": "Instrução Normativa BCB", "numero": 743, "leafText": "IN BCB 743/2026 — Pix Automático/Agendado", "branch": "modalidades"},
   {"tipo": "IN BCB", "numero": 743, "leafText": "IN 743/2026 — Pix Automático/Agendado", "branch": "modalidades"},
   {"tipo": "IN BCB", "numero": 748, "leafText": "IN 748/2026 — Capital mínimo participant…", "branch": "participantes"},
+  {"tipo": "IN BCB", "numero": 743, "leafText": "IN BCB 743 — Pix Automático: agendamento", "branch": "modalidades"},
+  {"tipo": "IN BCB", "numero": 748, "leafText": "IN BCB 748 — capital mínimo participante…", "branch": "participantes"},
 // __AUTO_NORMS_END__
 ];
 
 // Data da última injeção automática (atualizada pelo script Python)
-const LAST_AUTO_UPDATE = '08/07/2026'; // __LAST_UPDATE__
+const LAST_AUTO_UPDATE = '09/07/2026'; // __LAST_UPDATE__
 
 function applyAutoNorms() {
   AUTO_NORMS.forEach(n => {
