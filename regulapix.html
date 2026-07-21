@@ -1,1 +1,506 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RegulaPix — Mapa Mental</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #06101c;
+  font-family: 'Segoe UI', Inter, sans-serif;
+  overflow-x: auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px 40px;
+}
+h1 {
+  color: #00e676;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 6px;
+}
+p.sub { color: #4a7a8a; font-size: .75rem; text-align: center; margin-bottom: 20px; }
+
+svg { display: block; }
+
+/* Branch node circles */
+.branch-circle { cursor: pointer; }
+.branch-circle circle { transition: r .15s; }
+.branch-circle:hover circle { r: 36; }
+
+/* Leaf boxes */
+.leaf rect { rx: 6; }
+
+/* Leaves that link to an official norm */
+a.leaf-link { cursor: pointer; }
+a.leaf-link rect { transition: fill-opacity .15s, stroke-width .15s; }
+a.leaf-link:hover rect { fill-opacity: .3 !important; stroke-width: 2 !important; }
+a.leaf-link:focus rect { fill-opacity: .3 !important; stroke-width: 2 !important; }
+
+/* Root pulse */
+@keyframes pulse {
+  0%,100% { opacity: .5; transform: scale(1); }
+  50%      { opacity: .15; transform: scale(1.18); }
+}
+.root-pulse { transform-origin: center; animation: pulse 2.8s ease-in-out infinite; }
+
+/* ── Barra de status (somente leitura) ── */
+#updateBar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: #0b1c2c;
+  border-top: 1px solid #1a3a4a;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .75rem;
+  color: #4a7a8a;
+  z-index: 30;
+}
+</style>
+</head>
+<body>
+<h1>💸 RegulaPix</h1>
+<p class="sub">Clique nos ramos coloridos para expandir / recolher · folhas com 🔗 abrem a norma oficial em nova aba</p>
+
+<!-- Barra de status (somente leitura — atualização é feita pelo GitHub Actions) -->
+<div id="updateBar">
+  <span id="updateStatus">🔄 Atualizado automaticamente via GitHub Actions</span>
+</div>
+
+<div id="wrap"></div>
+
+<script>
+// --- Links oficiais para normas e regulamentos ---
+// BCB mantém uma página única "Exibe Normativo" que sempre traz o texto
+// vigente (já consolidado com alterações posteriores) de cada norma.
+function bcbNorm(tipo, numero) {
+  return `https://www.bcb.gov.br/estabilidadefinanceira/exibenormativo?tipo=${encodeURIComponent(tipo)}&numero=${numero}`;
+}
+
+const LINKS = {
+  lei12865: "https://www.planalto.gov.br/ccivil_03/_ato2011-2014/2013/lei/l12865.htm",
+  lei14286: "https://www.planalto.gov.br/ccivil_03/_ato2019-2022/2021/lei/l14286.htm",
+  res1:     bcbNorm("Resolução BCB", 1),
+  res142:   bcbNorm("Resolução BCB", 142),
+  res360:   bcbNorm("Resolução BCB", 360),
+  res402:   bcbNorm("Resolução BCB", 402),
+  res403:   bcbNorm("Resolução BCB", 403),
+  res406:   bcbNorm("Resolução BCB", 406),
+  res493:   bcbNorm("Resolução BCB", 493),
+  res506:   bcbNorm("Resolução BCB", 506),
+  circ3985: bcbNorm("Circular", 3985),
+  in511:    bcbNorm("Instrução Normativa BCB", 511),
+  in512:    bcbNorm("Instrução Normativa BCB", 512),
+  in633:    bcbNorm("Instrução Normativa BCB", 633),
+  in199:    bcbNorm("Instrução Normativa BCB", 199),
+  circ4027: bcbNorm("Circular", 4027),
+  res19:    bcbNorm("Resolução BCB", 19),
+  res80:    bcbNorm("Resolução BCB", 80),
+  res103:   bcbNorm("Resolução BCB", 103),
+  res135:   bcbNorm("Resolução BCB", 135),
+  res147:   bcbNorm("Resolução BCB", 147),
+  res496:   bcbNorm("Resolução BCB", 496),
+  res429:   bcbNorm("Resolução BCB", 429),
+  res494:   bcbNorm("Resolução BCB", 494),
+  res495:   bcbNorm("Resolução BCB", 495),
+  res501:   bcbNorm("Resolução BCB", 501),
+  res507:   bcbNorm("Resolução BCB", 507),
+  res559:   bcbNorm("Resolução BCB", 559),
+  in491:    bcbNorm("Instrução Normativa BCB", 491),
+};
+
+const BRANCHES = [
+  {
+    id:"legal", label:"Base Legal", icon:"⚖️", color:"#00C853",
+    side:"left",
+    leaves:[
+      {t:"Lei nº 12.865/2013 — arranjos de pgto.", url: LINKS.lei12865},
+      {t:"Lei nº 14.286/2021 — pgtos. internac.", url: LINKS.lei14286},
+      {t:"Res. BCB nº 1/2020 — institui o Pix", url: LINKS.res1},
+      {t:"Res. BCB nº 142/2021 — altera Reg.", url: LINKS.res142},
+      {t:"Res. BCB nº 360/2023 — Pix Automático", url: LINKS.res360},
+      {t:"Res. BCB nº 402/2024 — Pix Aut./Agend.", url: LINKS.res402},
+      {t:"Res. BCB nº 403/2024 — seg. e fraude", url: LINKS.res403},
+      {t:"Res. BCB nº 406/2024 — Pix Aproximação", url: LINKS.res406},
+      {t:"Res. BCB nº 429/2024 — só autorizadas", url: LINKS.res429},
+      {t:"Res. BCB nº 494/2025 — autorização IPs", url: LINKS.res494},
+      {t:"Res. BCB nº 495/2025 — sede obrigatória", url: LINKS.res495},
+      {t:"Res. BCB nº 501/2025 — rejeição suspeita", url: LINKS.res501},
+      {t:"Res. BCB nº 493/2025 — MED 2.0", url: LINKS.res493},
+      {t:"Res. BCB nº 506/2025 — seg./penalidades", url: LINKS.res506},
+      {t:"Res. BCB nº 507/2025 — Penalidades", url: LINKS.res507},
+      {t:"Circular BCB nº 3.985/2020 — tarifas", url: LINKS.circ3985},
+      {t:"IN BCB nº 511/2024 — adesão ao Pix", url: LINKS.in511},
+      {t:"Res. BCB nº 559/2026 — exclusão/CVM", url: LINKS.res559},
+    ]
+  },
+  {
+    id:"spi", label:"Infra SPI", icon:"🖧", color:"#90CAF9",
+    side:"left",
+    leaves:[
+      {t:"Sistema de Pagamentos Instantâneos (SPI)", url: LINKS.circ4027},
+      {t:"Operado pelo Banco Central do Brasil", url: LINKS.res1},
+      {t:"Disponível 24h / 7 dias / 365 dias", url: LINKS.res1},
+      {t:"Liquidação via Conta Reservas/PI", url: LINKS.circ4027},
+      {t:"Mensagens padrão ISO 20022", url: LINKS.circ4027},
+      {t:"API RESTful com mTLS e ICP-Brasil", url: LINKS.in633},
+    ]
+  },
+  {
+    id:"participantes", label:"Participantes", icon:"🏦", color:"#29B6F6",
+    side:"left",
+    leaves:[
+      {t:"Diretos — liquidam no SPI", url: LINKS.res1},
+      {t:"Indiretos — via participante direto", url: LINKS.res1},
+      {t:"Iniciadores de Transação de Pgto (ITP)", url: LINKS.res80},
+      {t:"Obrigatório: PSPs ≥ 500k clientes", url: LINKS.res1},
+      {t:"Só autorizadas pelo BCB participam", url: LINKS.res429},
+      {t:"Capital mínimo R$ 5 mi (prov. conta)", url: LINKS.res429},
+      {t:"IPs irregulares: prazo jan–mai/2026", url: LINKS.res496},
+      {t:"Novas IPs: prazo mai/2026", url: LINKS.res494},
+      {t:"Sede exclusiva obrigatória (s/ cowork.)", url: LINKS.res495},
+      {t:"Participante Responsável pelas indiretas", url: LINKS.res1},
+      {t:"Part. Responsável restrito a S1–S4", url: LINKS.res496},
+    ]
+  },
+  {
+    id:"chaves", label:"Chaves Pix", icon:"🔑", color:"#CE93D8",
+    side:"left",
+    leaves:[
+      {t:"CPF / CNPJ", url: LINKS.res1},
+      {t:"E-mail", url: LINKS.res1},
+      {t:"Telefone celular", url: LINKS.res1},
+      {t:"Chave aleatória (EVP)", url: LINKS.res1},
+      {t:"Limite: 5 por conta (PF) / 20 (PJ)", url: LINKS.res1},
+      {t:"Portabilidade e reivindicação entre PSPs", url: LINKS.res1},
+      {t:"Gerenciadas no DICT", url: LINKS.res1},
+    ]
+  },
+  {
+    id:"modalidades", label:"Modalidades", icon:"📱", color:"#FF9800",
+    side:"right",
+    leaves:[
+      {t:"Pix Comum — transferência avulsa", url: LINKS.res1},
+      {t:"QR Code Estático", url: LINKS.res1},
+      {t:"QR Code Dinâmico", url: LINKS.res1},
+      {t:"Pix Agendado — data futura", url: LINKS.res360},
+      {t:"Pix Automático — débito recorrente", url: LINKS.res360},
+      {t:"Pix por Aproximação (NFC)", url: LINKS.res406},
+      {t:"Pix Saque e Pix Troco", url: LINKS.res135},
+      {t:"Pix via Open Finance", url: LINKS.res406},
+      "Pix Internacional — em implementação",
+    ]
+  },
+  {
+    id:"limites", label:"Limites", icon:"⏰", color:"#FFD54F",
+    side:"right",
+    leaves:[
+      {t:"Diurno (6h–20h): limite pelo PSP", url: LINKS.res142},
+      {t:"Noturno (20h–6h): padrão R$ 1.000", url: LINKS.res142},
+      {t:"Usuário pode solicitar aumento (24h–48h)", url: LINKS.res142},
+      {t:"Pix Automático: conforme autorização", url: LINKS.res360},
+      {t:"IN BCB nº 512 — limites por jornada", url: LINKS.in512},
+      {t:"Dispositivo novo: R$ 200/tx, R$ 1k/dia", url: LINKS.in491},
+      {t:"Limites por risco de fraude/lavagem", url: LINKS.res506},
+    ]
+  },
+  {
+    id:"seguranca", label:"Segurança", icon:"🛡️", color:"#EF5350",
+    side:"right",
+    leaves:[
+      {t:"DICT — Diretório de Identificadores", url: LINKS.res1},
+      {t:"MED — Devolução especial (fraudes/erros)", url: LINKS.res103},
+      {t:"MED 2.0 — recuperação aprimorada /2026", url: LINKS.res493},
+      {t:"Autenticação forte obrigatória (MFA)", url: LINKS.res403},
+      {t:"Cadastro obrigatório de dispositivo", url: LINKS.in491},
+      {t:"Certificado digital ICP-Brasil", url: LINKS.res1},
+      {t:"Manual de Segurança do Pix (IN 633/2025)", url: LINKS.in633},
+      {t:"Bloqueio cautelar via Infojud / SIMBA", url: LINKS.res147},
+      {t:"Monitoramento de transações suspeitas", url: LINKS.res506},
+      {t:"Marcação de fraude transacional no DICT", url: LINKS.res506},
+      {t:"Rejeição de tx c/ suspeita de fraude", url: LINKS.res501},
+      {t:"Manual de Penalidades (Res. 507/2025)", url: LINKS.res507},
+      {t:"Multa diária até R$ 200 mil (60 dias)", url: LINKS.res506},
+      {t:"Exclusão por inatividade + auditoria CVM", url: LINKS.res559},
+    ]
+  },
+  {
+    id:"tarifas", label:"Tarifas", icon:"💰", color:"#26A69A",
+    side:"right",
+    leaves:[
+      {t:"Gratuito para Pessoa Física", url: LINKS.res19},
+      {t:"MEI: gratuito até 35 transações/mês", url: LINKS.res19},
+      {t:"PJ: tarifação permitida pelo PSP", url: LINKS.res19},
+      {t:"Teto interbancário definido pelo BCB", url: LINKS.res19},
+      {t:"Pix Saque/Troco: tarifa ao facilitador", url: LINKS.in199},
+      {t:"Liquidação D+0 — sem custo de TED/DOC", url: LINKS.res1},
+    ]
+  },
+];
+
+// --- Layout constants ---
+const CX = 520;           // centre X of root
+const ROOT_R = 52;
+const BRANCH_R = 34;
+
+const LEAF_W = 270;       // leaf box width
+const LEAF_H = 28;        // leaf box height
+const LEAF_GAP = 7;       // vertical gap between leaves
+const BRANCH_GAP = 28;    // vertical gap between branches
+
+// horizontal distances
+const ROOT_TO_BRANCH = 130;   // root edge → branch centre
+const BRANCH_TO_LEAF = 90;    // branch edge → leaf start
+
+// ---- compute total height ----
+const leftBranches  = BRANCHES.filter(b => b.side === 'left');
+const rightBranches = BRANCHES.filter(b => b.side === 'right');
+
+function branchHeight(b, expanded) {
+  if (!expanded) return BRANCH_R * 2;
+  return Math.max(BRANCH_R * 2, b.leaves.length * (LEAF_H + LEAF_GAP) - LEAF_GAP);
+}
+
+const state = {};  // id → expanded bool
+BRANCHES.forEach(b => state[b.id] = false);
+
+function totalColumnHeight(branches) {
+  return branches.reduce((s, b) => s + branchHeight(b, state[b.id]) + BRANCH_GAP, -BRANCH_GAP);
+}
+
+function draw() {
+  const leftH  = totalColumnHeight(leftBranches);
+  const rightH = totalColumnHeight(rightBranches);
+  const contentH = Math.max(leftH, rightH);
+  const SVG_H = contentH + ROOT_R * 2 + 60;
+
+  // x positions
+  const branchLX = CX - ROOT_TO_BRANCH - BRANCH_R;       // left branch cx
+  const branchRX = CX + ROOT_TO_BRANCH + BRANCH_R;       // right branch cx
+  const leafLX   = branchLX - BRANCH_TO_LEAF - LEAF_W;   // left leaf right edge (leaves go leftward)
+  const leafRX   = branchRX + BRANCH_TO_LEAF;             // right leaf left edge
+
+  const CY = SVG_H / 2;
+
+  // Margem extra de segurança: textos mais longos (ex.: com o ícone 🔗)
+  // podem ultrapassar ligeiramente a largura da caixa. Em vez de fixar o
+  // viewBox em "0 0 ...", calculamos a extensão real do conteúdo para a
+  // esquerda e para a direita, evitando que qualquer folha fique cortada.
+  const OVERFLOW_MARGIN = 60;
+  const minX = Math.min(0, leafLX - OVERFLOW_MARGIN);
+  const maxX = leafRX + LEAF_W + OVERFLOW_MARGIN;
+  const SVG_W = maxX - minX;
+
+  // Build SVG string
+  let s = `<svg viewBox="${minX} 0 ${SVG_W} ${SVG_H}" width="${SVG_W}" style="max-width:100%">`;
+  s += `<defs>
+    <radialGradient id="rg" cx="40%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#00e676"/>
+      <stop offset="100%" stop-color="#007a33"/>
+    </radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="sg"><feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>`;
+
+  // --- draw each column ---
+  function drawColumn(branches, side) {
+    const bx = side === 'left' ? branchLX : branchRX;
+    const colH = totalColumnHeight(branches);
+    let y = CY - colH / 2 + BRANCH_R;
+
+    branches.forEach(b => {
+      const by = y;
+      const exp = state[b.id];
+      const bh = branchHeight(b, exp);
+      const midY = by + (bh - BRANCH_R * 2) / 2;   // vertical centre of this branch block
+
+      // root → branch line (horizontal)
+      const lx1 = side === 'left' ? CX - ROOT_R : CX + ROOT_R;
+      const lx2 = side === 'left' ? bx + BRANCH_R : bx - BRANCH_R;
+      s += `<line x1="${lx1}" y1="${CY}" x2="${lx2}" y2="${midY}"
+        stroke="${b.color}" stroke-width="2" stroke-opacity=".5"
+        stroke-dasharray="${exp ? 'none' : '5 3'}"/>`;
+
+      // branch → leaves lines + leaf boxes
+      if (exp) {
+        const lStartX = side === 'left' ? bx - BRANCH_R - BRANCH_TO_LEAF : bx + BRANCH_R + BRANCH_TO_LEAF;
+        b.leaves.forEach((leaf, i) => {
+          const ly = by + i * (LEAF_H + LEAF_GAP);
+          const lcy = ly + LEAF_H / 2;
+          const llx = side === 'left' ? leafLX : leafRX;
+          const url = leafUrl(leaf);
+          const txt = leafText(leaf);
+
+          // connector line branch → leaf
+          const connX1 = side === 'left' ? bx - BRANCH_R : bx + BRANCH_R;
+          const connX2 = side === 'left' ? llx + LEAF_W : llx;
+          s += `<path d="M ${connX1} ${midY} C ${(connX1+connX2)/2} ${midY}, ${(connX1+connX2)/2} ${lcy}, ${connX2} ${lcy}"
+            fill="none" stroke="${b.color}" stroke-width="1.4" stroke-opacity=".6" stroke-dasharray="4 3"/>`;
+
+          if (url) {
+            s += `<a href="${url}" target="_blank" rel="noopener noreferrer" class="leaf-link"
+              onclick="try{window.open('${url}','_blank','noopener,noreferrer');}catch(e){} return false;">
+              <title>${escHtml(txt)} — abrir norma oficial (nova aba)</title>`;
+          }
+
+          // leaf box
+          s += `<rect x="${llx}" y="${ly}" width="${LEAF_W}" height="${LEAF_H}" rx="6"
+            fill="${b.color}" fill-opacity="${url ? .2 : .12}" stroke="${b.color}" stroke-width="${url ? 1.6 : 1.1}" stroke-opacity="${url ? 1 : .7}"/>`;
+          // leaf text
+          const tx = llx + LEAF_W/2;
+          s += `<text x="${tx}" y="${lcy}" text-anchor="middle" dominant-baseline="middle"
+            fill="${url ? '#c8f1ff' : '#dff3ff'}" font-size="10.5" font-family="Segoe UI,Inter,sans-serif">${escHtml(txt)}${url ? '  🔗' : ''}</text>`;
+
+          if (url) s += `</a>`;
+        });
+      }
+
+      // branch circle (drawn on top)
+      const filter = exp ? 'filter="url(#sg)"' : '';
+      s += `<g class="branch-g" data-id="${b.id}" ${filter} style="cursor:pointer">
+        <circle cx="${bx}" cy="${midY}" r="${BRANCH_R}"
+          fill="${b.color}" fill-opacity="${exp ? .3 : .15}"
+          stroke="${b.color}" stroke-width="${exp ? 2.5 : 1.5}"/>
+        <text x="${bx}" y="${midY - 13}" text-anchor="middle" dominant-baseline="middle" font-size="17">${b.icon}</text>
+        <text x="${bx}" y="${midY + 5}" text-anchor="middle" dominant-baseline="middle"
+          fill="#fff" font-size="10.5" font-weight="700" font-family="Segoe UI,Inter,sans-serif">${b.label}</text>
+        <text x="${bx}" y="${midY + 20}" text-anchor="middle" dominant-baseline="middle"
+          fill="${b.color}" font-size="8.5" font-family="Segoe UI,Inter,sans-serif" opacity=".85">
+          ${exp ? '▲ fechar' : `▼ ${b.leaves.length} itens`}</text>
+      </g>`;
+
+      y += bh + BRANCH_GAP;
+    });
+  }
+
+  drawColumn(leftBranches,  'left');
+  drawColumn(rightBranches, 'right');
+
+  // root node (on top of everything)
+  s += `<circle cx="${CX}" cy="${CY}" r="${ROOT_R + 10}" fill="#00C853" fill-opacity=".08" class="root-pulse"/>`;
+  s += `<circle cx="${CX}" cy="${CY}" r="${ROOT_R}" fill="url(#rg)" filter="url(#glow)"/>`;
+  s += `<text x="${CX}" y="${CY - 9}" text-anchor="middle" dominant-baseline="middle"
+    fill="#fff" font-size="18" font-weight="900" font-family="Segoe UI,Inter,sans-serif">Pix</text>`;
+  s += `<text x="${CX}" y="${CY + 11}" text-anchor="middle" dominant-baseline="middle"
+    fill="#b9f6ca" font-size="10" font-weight="600" font-family="Segoe UI,Inter,sans-serif">Regulamentos</text>`;
+  s += `<text x="${CX}" y="${CY + 26}" text-anchor="middle" dominant-baseline="middle"
+    fill="#69f0ae" font-size="8.5" font-family="Segoe UI,Inter,sans-serif">BCB</text>`;
+
+  s += `</svg>`;
+
+  document.getElementById('wrap').innerHTML = s;
+
+  // attach click handlers
+  document.querySelectorAll('.branch-g').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.id;
+      state[id] = !state[id];
+      draw();
+    });
+  });
+}
+
+function escHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// folhas podem ser uma string simples ou {t, url} quando citam uma norma
+function leafText(l) { return typeof l === 'string' ? l : l.t; }
+function leafUrl(l)  { return typeof l === 'string' ? null : (l.url || null); }
+
+// Compara dois textos de folha ignorando truncagem com "…" e maiúsculas/minúsculas.
+// Resolve duplicatas onde um texto é truncado e o outro é completo.
+function sameLeaf(a, b) {
+  const norm = s => s.replace(/…$/, '').trim().toLowerCase();
+  const na = norm(a), nb = norm(b);
+  return na === nb || na.startsWith(nb) || nb.startsWith(na);
+}
+
+draw();
+
+// ═══════════════════════════════════════════════════════════════
+//  ATUALIZAÇÃO AUTOMÁTICA — GitHub Actions
+//  Este HTML é atualizado automaticamente, 1x por dia, por um
+//  workflow no GitHub que consulta a API do Claude com busca web
+//  e injeta as novas normas diretamente no bloco AUTO_NORMS abaixo.
+//  Nada disso é executado no navegador do visitante.
+// ═══════════════════════════════════════════════════════════════
+
+// Normas já presentes no mapa (usado pelo script Python para não repetir buscas)
+const CURRENT_NORMS = [
+  'Lei 12865/2013','Lei 14286/2021',
+  'Res BCB 1/2020','Res BCB 19/2020','Res BCB 80/2021','Res BCB 103/2021',
+  'Res BCB 135/2021','Res BCB 142/2021','Res BCB 147/2021','Res BCB 360/2023',
+  'Res BCB 402/2024','Res BCB 403/2024','Res BCB 406/2024','Res BCB 429/2024',
+  'Res BCB 493/2025','Res BCB 494/2025','Res BCB 495/2025','Res BCB 496/2025',
+  'Res BCB 501/2025','Res BCB 506/2025','Res BCB 507/2025','Res BCB 559/2026',
+  'Circular BCB 3985/2020','Circular BCB 4027/2020',
+  'IN BCB 199/2021','IN BCB 491/2024','IN BCB 511/2024','IN BCB 512/2024','IN BCB 633/2025',
+  'IN BCB 722/2026','IN BCB 742/2026','IN BCB 746/2026','IN BCB 748/2026','IN BCB 752/2026',
+];
+
+// Trunca texto para caber dentro da caixa (270px útil, ~41 chars com 🔗)
+function fitLeafText(txt) {
+  const MAX_CHARS = 41;
+  if (txt.length <= MAX_CHARS) return txt;
+  return txt.slice(0, MAX_CHARS - 1).trimEnd() + '…';
+}
+
+// ── Normas adicionadas pelo GitHub Actions (não editar manualmente) ──
+const AUTO_NORMS = [
+// __AUTO_NORMS_START__
+// __AUTO_NORMS_END__
+];
+
+// Data da última injeção automática (atualizada pelo script Python)
+const LAST_AUTO_UPDATE = '21/07/2026'; // __LAST_UPDATE__
+
+function applyAutoNorms() {
+  AUTO_NORMS.forEach(n => {
+    if (!n || !n.tipo || !n.numero || !n.leafText || !n.branch) return;
+    const url  = bcbNorm(n.tipo, n.numero);
+    const leaf = { t: fitLeafText(n.leafText), url };
+    const branch = BRANCHES.find(b => b.id === n.branch);
+    if (!branch) return;
+    if (!branch.leaves.some(l => sameLeaf(leafText(l), leaf.t))) {
+      branch.leaves.push(leaf);
+      state[n.branch] = true; // expande o ramo para mostrar a novidade
+    }
+    if (n.branch !== 'legal') {
+      const legal = BRANCHES.find(b => b.id === 'legal');
+      if (legal && !legal.leaves.some(l => sameLeaf(leafText(l), leaf.t))) {
+        legal.leaves.push(leaf);
+        state['legal'] = true;
+      }
+    }
+  });
+}
+
+// ── Inicialização ────────────────────────────────────────────
+(function init() {
+  applyAutoNorms();
+  draw();
+
+  const statusEl = document.getElementById('updateStatus');
+  if (statusEl) {
+    statusEl.textContent = LAST_AUTO_UPDATE
+      ? `🔄 Última atualização automática: ${LAST_AUTO_UPDATE}`
+      : '🔄 Atualizado automaticamente via GitHub Actions';
+  }
+})();
+</script>
+</body>
+</html>
 
