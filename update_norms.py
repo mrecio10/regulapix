@@ -120,31 +120,62 @@ def main():
     print(f'Resultado: {data.get("summary", "")}')
 
     if not new_norms:
-        print('Nenhuma norma nova — HTML não alterado.')
+        # Mesmo sem normas novas, atualiza a data para mostrar que o robô rodou hoje
+        today_str = date.today().strftime('%d/%m/%Y')
+        html = re.sub(
+            r"const LAST_AUTO_UPDATE = '[^']*';.*",
+            f"const LAST_AUTO_UPDATE = '{today_str}'; // __LAST_UPDATE__",
+            html,
+        )
+        with open(HTML_FILE, 'w', encoding='utf-8') as f:
+            f.write(html)
+        print(f'Data atualizada para {today_str} — nenhuma norma nova encontrada.')
         sys.exit(0)
 
     # ── 5. Mesclar novas normas com as existentes ─────────────
-    # Normaliza texto removendo "…" final — evita duplicatas quando
-    # um texto é completo e outro é truncado (ex: "IN BCB 746/2026 — limites Pix aproximação"
-    # vs "IN BCB 746/2026 — limites Pix aproxima…")
+    # Três camadas de proteção contra duplicatas:
+    # 1. Número da norma já em CURRENT_NORMS (verificação no HTML)
+    # 2. Número da norma já em AUTO_NORMS (verificação no array existente)
+    # 3. Texto similar por normalização (truncagem, maiúsculas)
     def norm_text(s):
         return s.replace('…', '').strip().lower()
 
+    # Conjunto de números já conhecidos (AUTO_NORMS + HTML inteiro)
+    existing_numbers = {str(n.get('numero', '')) for n in existing_auto}
+
     existing_norms_set = [(n['leafText'], norm_text(n['leafText'])) for n in existing_auto]
 
-    def is_duplicate(new_text):
-        nt = norm_text(new_text)
+    def is_duplicate(new_norm):
+        numero = str(new_norm.get('numero', ''))
+        text   = new_norm.get('leafText', '')
+        nt     = norm_text(text)
+
+        # 1. Verificação por número — mais confiável
+        if numero and numero in existing_numbers:
+            return True
+
+        # 2. Verificação por número no HTML completo (inclui BRANCHES e CURRENT_NORMS)
+        if numero and (
+            f'BCB nº {numero}' in html or
+            f'BCB {numero}/' in html or
+            f'numero": {numero}' in html.replace(' ', '') or
+            f"/{numero}'" in html
+        ):
+            return True
+
+        # 3. Verificação por texto similar (fallback)
         for _, en in existing_norms_set:
             if nt == en or nt.startswith(en) or en.startswith(nt):
                 return True
-        # Verificar também em CURRENT_NORMS e BRANCHES do HTML
-        return norm_text(new_text)[:30] in html.lower()
+
+        return False
 
     added = []
     for norm in new_norms:
         norm['leafText'] = fit_leaf_text(norm['leafText'])
-        if not is_duplicate(norm['leafText']):
+        if not is_duplicate(norm):
             existing_auto.append(norm)
+            existing_numbers.add(str(norm.get('numero', '')))
             existing_norms_set.append((norm['leafText'], norm_text(norm['leafText'])))
             added.append(norm)
 
