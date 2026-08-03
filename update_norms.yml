@@ -6,7 +6,7 @@ on:
   workflow_dispatch:       # Permite disparar manualmente pelo GitHub
 
 permissions:
-  contents: write          # Necessário para commitar o HTML atualizado
+  contents: write
 
 jobs:
   update:
@@ -22,14 +22,14 @@ jobs:
           python-version: '3.12'
 
       - name: Instalar dependências
-        run: pip install anthropic
+        run: pip install anthropic requests
 
       - name: Verificar e injetar novas normas
         run: python update_norms.py
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
-      - name: Commitar e publicar se houver mudanças
+      - name: Commitar no GitHub se houver mudanças
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -37,3 +37,108 @@ jobs:
           git diff --staged --quiet \
             && echo "Sem mudanças para commitar." \
             || (git commit -m "🔄 Normas atualizadas $(date +'%d/%m/%Y')" && git push)
+
+      - name: Diagnosticar Workers na conta Cloudflare
+        run: |
+          python3 - << 'PYEOF'
+          import os, requests
+
+          account_id = os.environ['CLOUDFLARE_ACCOUNT_ID']
+          api_token  = os.environ['CLOUDFLARE_API_TOKEN']
+
+          headers = {'Authorization': f'Bearer {api_token}'}
+
+          # Listar todos os workers da conta
+          r = requests.get(
+              f'https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts',
+              headers=headers
+          )
+          print(f'HTTP: {r.status_code}')
+          body = r.json()
+          if body.get('success'):
+              workers = body.get('result', [])
+              print(f'Workers encontrados: {len(workers)}')
+              for w in workers:
+                  print(f'  - id: {w.get("id")} | etag: {w.get("etag", "")[:8]}')
+          else:
+              print('Erro:', body.get('errors'))
+          PYEOF
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Publicar HTML atualizado no Cloudflare Worker
+        run: |
+          python3 - << 'PYEOF'
+          import os, sys, json, requests
+
+          account_id  = os.environ['CLOUDFLARE_ACCOUNT_ID']
+          api_token   = os.environ['CLOUDFLARE_API_TOKEN']
+          worker_name = 'regulapix'
+
+          with open('regulapix.html', 'r', encoding='utf-8') as f:
+              html = f.read()
+
+          html_json = json.dumps(html)
+          worker_script = f"""export default {{
+            async fetch(request) {{
+              const url = new URL(request.url);
+              const html = {html_json};
+              return new Response(html, {{
+                headers: {{ 'Content-Type': 'text/html; charset=utf-8' }}
+              }});
+            }}
+          }};"""
+
+          url = f'https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/{worker_name}'
+          headers = {{
+              'Authorization': f'Bearer {api_token}',
+          }}
+
+          print(f'Enviando worker "{worker_name}" ({len(worker_script)} bytes)...')
+
+          # Usar multipart/form-data (formato recomendado pelo Cloudflare)
+          r = requests.put(
+              url,
+              headers=headers,
+              files={{
+                  'metadata': (None, json.dumps({{'main_module': 'worker.js'}}), 'application/json'),
+                  'worker.js': ('worker.js', worker_script.encode('utf-8'), 'application/javascript+module'),
+              }}
+          )
+
+          print(f'HTTP status: {r.status_code}')
+          print(f'Resposta completa: {r.text[:1000]}')
+
+          body = r.json()
+          if body.get('success'):
+              print('✅ Worker atualizado com sucesso!')
+          else:
+              print('❌ Falha:', body.get('errors'))
+              sys.exit(1)
+          PYEOF
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Verificar se o site foi atualizado
+        run: |
+          python3 - << 'PYEOF'
+          import urllib.request, re, time
+
+          time.sleep(5)  # aguarda propagação
+
+          url = 'https://regulapix.msrecio1.workers.dev/regulapix'
+          print(f'Verificando {url}...')
+
+          try:
+              with urllib.request.urlopen(url, timeout=15) as r:
+                  html = r.read().decode('utf-8')
+              m = re.search(r"LAST_AUTO_UPDATE = '([^']+)'", html)
+              if m:
+                  print(f'✅ Data no site: {m.group(1)}')
+              else:
+                  print('⚠️  Data não encontrada no HTML retornado')
+          except Exception as e:
+              print(f'Erro ao verificar: {e}')
+          PYEOF
