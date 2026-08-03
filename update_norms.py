@@ -87,7 +87,7 @@ def main():
     print('Consultando API do Claude...')
     response = client.messages.create(
         model='claude-sonnet-4-6',
-        max_tokens=1000,
+        max_tokens=4000,
         system=(
             'Você é especialista em regulamentação brasileira do Pix. '
             'Sua resposta final deve conter SOMENTE o objeto JSON, começando '
@@ -100,7 +100,22 @@ def main():
         messages=[{'role': 'user', 'content': prompt}],
     )
 
-    text = ''.join(getattr(b, 'text', '') for b in response.content)
+    # Pegar apenas os blocos de texto com conteúdo, ignorando tool_use e tool_result
+    text_blocks = [
+        b.text.strip()
+        for b in response.content
+        if hasattr(b, 'text') and b.text and b.text.strip()
+    ]
+
+    if not text_blocks:
+        print('ERRO: a API não retornou nenhum texto.')
+        print('stop_reason:', response.stop_reason)
+        print('Blocos recebidos:', [type(b).__name__ for b in response.content])
+        sys.exit(1)
+
+    # Usar o ÚLTIMO bloco de texto — é onde fica o JSON final após a busca
+    text = text_blocks[-1]
+    print(f'Blocos de texto recebidos: {len(text_blocks)} — usando o último')
     text = re.sub(r'```json|```', '', text).strip()
 
     # A API às vezes adiciona uma frase explicativa antes do JSON,
