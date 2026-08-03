@@ -80,41 +80,42 @@ jobs:
               html = f.read()
 
           html_json = json.dumps(html)
-          worker_script = f"""export default {{
-            async fetch(request) {{
-              const url = new URL(request.url);
-              const html = {html_json};
-              return new Response(html, {{
-                headers: {{ 'Content-Type': 'text/html; charset=utf-8' }}
-              }});
-            }}
-          }};"""
 
-          url = f'https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/{worker_name}'
-          headers = {{
-              'Authorization': f'Bearer {api_token}',
-          }}
-
-          print(f'Enviando worker "{worker_name}" ({len(worker_script)} bytes)...')
-
-          # Usar multipart/form-data (formato recomendado pelo Cloudflare)
-          r = requests.put(
-              url,
-              headers=headers,
-              files={{
-                  'metadata': (None, json.dumps({{'main_module': 'worker.js'}}), 'application/json'),
-                  'worker.js': ('worker.js', worker_script.encode('utf-8'), 'application/javascript+module'),
-              }}
+          # Worker script — chaves JS escapadas com {{ }} no f-string
+          worker_script = (
+              'export default {\n'
+              '  async fetch(request) {\n'
+              '    const html = ' + html_json + ';\n'
+              '    return new Response(html, {\n'
+              '      headers: { "Content-Type": "text/html; charset=utf-8" }\n'
+              '    });\n'
+              '  }\n'
+              '};'
           )
 
-          print(f'HTTP status: {r.status_code}')
-          print(f'Resposta completa: {r.text[:1000]}')
+          api_url = 'https://api.cloudflare.com/client/v4/accounts/' + account_id + '/workers/scripts/' + worker_name
+          auth_headers = {'Authorization': 'Bearer ' + api_token}
+
+          print('Enviando worker "' + worker_name + '" (' + str(len(worker_script)) + ' bytes)...')
+
+          metadata = json.dumps({'main_module': 'worker.js'})
+          r = requests.put(
+              api_url,
+              headers=auth_headers,
+              files=[
+                  ('metadata', (None, metadata, 'application/json')),
+                  ('worker.js', ('worker.js', worker_script.encode('utf-8'), 'application/javascript+module')),
+              ]
+          )
+
+          print('HTTP status:', r.status_code)
+          print('Resposta:', r.text[:800])
 
           body = r.json()
           if body.get('success'):
-              print('✅ Worker atualizado com sucesso!')
+              print('Worker atualizado com sucesso!')
           else:
-              print('❌ Falha:', body.get('errors'))
+              print('Falha:', body.get('errors'))
               sys.exit(1)
           PYEOF
         env:
