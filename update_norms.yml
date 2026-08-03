@@ -72,44 +72,56 @@ jobs:
           python3 - << 'PYEOF'
           import os, sys, json, requests
 
-          account_id  = os.environ['CLOUDFLARE_ACCOUNT_ID']
-          api_token   = os.environ['CLOUDFLARE_API_TOKEN']
+          account_id  = os.environ.get('CLOUDFLARE_ACCOUNT_ID', '')
+          api_token   = os.environ.get('CLOUDFLARE_API_TOKEN', '')
           worker_name = 'regulapix'
+
+          # Verificar se os secrets estão disponíveis
+          print('Account ID (primeiros 6):', account_id[:6] if account_id else 'VAZIO!')
+          print('API Token (primeiros 6):', api_token[:6] if api_token else 'VAZIO!')
+
+          if not account_id or not api_token:
+              print('ERRO: Secrets CLOUDFLARE_ACCOUNT_ID ou CLOUDFLARE_API_TOKEN estao vazios.')
+              sys.exit(1)
 
           with open('regulapix.html', 'r', encoding='utf-8') as f:
               html = f.read()
 
           html_json = json.dumps(html)
 
-          # Worker script — chaves JS escapadas com {{ }} no f-string
+          # Service Worker format — compatível com upload direto como application/javascript
           worker_script = (
-              'export default {\n'
-              '  async fetch(request) {\n'
-              '    const html = ' + html_json + ';\n'
-              '    return new Response(html, {\n'
-              '      headers: { "Content-Type": "text/html; charset=utf-8" }\n'
-              '    });\n'
-              '  }\n'
-              '};'
+              'addEventListener("fetch", event => {\n'
+              '  event.respondWith(handleRequest(event.request));\n'
+              '});\n\n'
+              'async function handleRequest(request) {\n'
+              '  const html = ' + html_json + ';\n'
+              '  return new Response(html, {\n'
+              '    headers: { "Content-Type": "text/html; charset=utf-8" }\n'
+              '  });\n'
+              '}'
           )
 
-          api_url = 'https://api.cloudflare.com/client/v4/accounts/' + account_id + '/workers/scripts/' + worker_name
-          auth_headers = {'Authorization': 'Bearer ' + api_token}
+          api_url = (
+              'https://api.cloudflare.com/client/v4/accounts/'
+              + account_id
+              + '/workers/scripts/'
+              + worker_name
+          )
 
-          print('Enviando worker "' + worker_name + '" (' + str(len(worker_script)) + ' bytes)...')
+          print('Enviando', len(worker_script), 'bytes para', api_url[:60] + '...')
 
-          metadata = json.dumps({'main_module': 'worker.js'})
           r = requests.put(
               api_url,
-              headers=auth_headers,
-              files=[
-                  ('metadata', (None, metadata, 'application/json')),
-                  ('worker.js', ('worker.js', worker_script.encode('utf-8'), 'application/javascript+module')),
-              ]
+              headers={
+                  'Authorization': 'Bearer ' + api_token,
+                  'Content-Type': 'application/javascript',
+              },
+              data=worker_script.encode('utf-8')
           )
 
           print('HTTP status:', r.status_code)
-          print('Resposta:', r.text[:800])
+          print('Resposta:', r.text[:600])
 
           body = r.json()
           if body.get('success'):
