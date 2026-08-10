@@ -440,6 +440,7 @@ draw();
 
 // Normas já presentes no mapa (usado pelo script Python para não repetir buscas)
 const CURRENT_NORMS = [
+  'Lei 15397/2026',
   'Res BCB 546/2026',
   'IN BCB 766/2026',
   'Res BCB 566/2026',
@@ -473,11 +474,12 @@ const AUTO_NORMS = [
   {"tipo": "Resolução BCB", "numero": 566, "leafText": "Res. BCB 566/2026 — conta-salário/portab.", "branch": "modalidades"},
   {"tipo": "Instrução Normativa BCB", "numero": 766, "leafText": "IN BCB 766/2026 — DICT v8.5", "branch": "chaves"},
   {"tipo": "Resolução BCB", "numero": 546, "leafText": "Res. BCB 546/2026 — supervisão Pix (susp…", "branch": "participantes"},
+  {"tipo": "Lei", "numero": 15397, "leafText": "Lei 15.397/2026 — conta laranja Pix", "branch": "legal"},
 // __AUTO_NORMS_END__
 ];
 
 // Data da última injeção automática (atualizada pelo script Python)
-const LAST_AUTO_UPDATE = '09/08/2026'; // __LAST_UPDATE__
+const LAST_AUTO_UPDATE = '10/08/2026'; // __LAST_UPDATE__
 
 function applyAutoNorms() {
   AUTO_NORMS.forEach(n => {
