@@ -1,7 +1,7 @@
 name: Atualizar Normas do Pix
 
 on:
-schedule:
+  schedule:
     - cron: '0 9 * * *'
   workflow_dispatch:
 
@@ -13,47 +13,45 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Baixar repositório
+      - name: Checkout
         uses: actions/checkout@v4.2.2
 
-      - name: Configurar Python
+      - name: Setup Python
         uses: actions/setup-python@v5.6.0
         with:
           python-version: '3.12'
 
-      - name: Instalar dependências
+      - name: Instalar dependencias
         run: pip install anthropic requests
 
-      - name: Verificar e injetar novas normas
+      - name: Verificar novas normas
         run: python update_norms.py
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
-      - name: Commitar no GitHub se houver mudanças
+      - name: Commitar mudancas
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add regulapix.html
-          git diff --staged --quiet \
-            && echo "Sem mudanças para commitar." \
-            || (git commit -m "Normas atualizadas $(date +'%d/%m/%Y')" && git push)
+          git diff --staged --quiet && echo "Sem mudancas." || git commit -m "Normas atualizadas $(date +'%d/%m/%Y')" && git push
 
       - name: Publicar no Cloudflare Worker
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_API_KEY: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
         run: |
-          python3 -c "
+          python3 << 'EOF'
           import os, sys, json, requests
 
-          account_id = os.environ.get('CLOUDFLARE_ACCOUNT_ID', '')
-          api_key    = os.environ.get('CLOUDFLARE_API_TOKEN', '')
-          email      = os.environ.get('CLOUDFLARE_EMAIL', '')
+          account_id = os.environ.get('CF_ACCOUNT_ID', '')
+          api_key    = os.environ.get('CF_API_KEY', '')
+          email      = os.environ.get('CF_EMAIL', '')
 
-          print('Account ID (6):', account_id[:6])
-          print('API Key (6):', api_key[:6] if api_key else 'VAZIO')
-          print('Email (6):', email[:6] if email else 'VAZIO')
+          print('Account ID:', account_id[:6])
+          print('API Key:', api_key[:6] if api_key else 'VAZIO')
+          print('Email:', email[:6] if email else 'VAZIO')
 
           if not api_key or not account_id or not email:
               print('ERRO: Secrets ausentes')
@@ -62,37 +60,125 @@ jobs:
           with open('regulapix.html', 'r', encoding='utf-8') as f:
               html = f.read()
 
-          worker_script = (
-              'addEventListener(\"fetch\", event => {'
-              '  event.respondWith(handleRequest(event.request));'
-              '});'
-              'async function handleRequest(request) {'
-              '  const html = ' + json.dumps(html) + ';'
-              '  return new Response(html, {'
-              '    headers: {\"Content-Type\": \"text/html; charset=utf-8\"}'
-              '  });'
-              '}'
+          script = (
+              'addEventListener("fetch", event => {'
+              + '  event.respondWith(handleRequest(event.request));'
+              + '});'
+              + 'async function handleRequest(request) {'
+              + '  const html = ' + json.dumps(html) + ';'
+              + '  return new Response(html, {'
+              + '    headers: {"Content-Type": "text/html; charset=utf-8"}'
+              + '  });'
+              + '}'
           )
 
-          url = ('https://api.cloudflare.com/client/v4/accounts/'
-                 + account_id + '/workers/scripts/regulapix')
+          url = 'https://api.cloudflare.com/client/v4/accounts/' + account_id + '/workers/scripts/regulapix'
 
-          # Autenticação com Global API Key (X-Auth-Email + X-Auth-Key)
           r = requests.put(url,
               headers={
                   'X-Auth-Email': email,
                   'X-Auth-Key': api_key,
                   'Content-Type': 'application/javascript',
               },
-              data=worker_script.encode('utf-8'))
+              data=script.encode('utf-8'))
 
           print('HTTP:', r.status_code)
-          print('Resposta:', r.text[:400])
-
           body = r.json()
-          if body.get('success'):
-              print('Worker atualizado com sucesso!')
-          else:
-              print('Falha:', body.get('errors'))
+          print('Success:', body.get('success'))
+          if not body.get('success'):
+              print('Errors:', body.get('errors'))
               sys.exit(1)
-          "
+          print('Worker atualizado!')
+          EOF
+name: Atualizar Normas do Pix
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependencias
+        run: pip install anthropic requests
+
+      - name: Verificar novas normas
+        run: python update_norms.py
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Commitar mudancas
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add regulapix.html
+          git diff --staged --quiet && echo "Sem mudancas." || git commit -m "Normas atualizadas $(date +'%d/%m/%Y')" && git push
+
+      - name: Publicar no Cloudflare Worker
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_API_KEY: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+        run: |
+          python3 << 'EOF'
+          import os, sys, json, requests
+
+          account_id = os.environ.get('CF_ACCOUNT_ID', '')
+          api_key    = os.environ.get('CF_API_KEY', '')
+          email      = os.environ.get('CF_EMAIL', '')
+
+          print('Account ID:', account_id[:6])
+          print('API Key:', api_key[:6] if api_key else 'VAZIO')
+          print('Email:', email[:6] if email else 'VAZIO')
+
+          if not api_key or not account_id or not email:
+              print('ERRO: Secrets ausentes')
+              sys.exit(1)
+
+          with open('regulapix.html', 'r', encoding='utf-8') as f:
+              html = f.read()
+
+          script = (
+              'addEventListener("fetch", event => {'
+              + '  event.respondWith(handleRequest(event.request));'
+              + '});'
+              + 'async function handleRequest(request) {'
+              + '  const html = ' + json.dumps(html) + ';'
+              + '  return new Response(html, {'
+              + '    headers: {"Content-Type": "text/html; charset=utf-8"}'
+              + '  });'
+              + '}'
+          )
+
+          url = 'https://api.cloudflare.com/client/v4/accounts/' + account_id + '/workers/scripts/regulapix'
+
+          r = requests.put(url,
+              headers={
+                  'X-Auth-Email': email,
+                  'X-Auth-Key': api_key,
+                  'Content-Type': 'application/javascript',
+              },
+              data=script.encode('utf-8'))
+
+          print('HTTP:', r.status_code)
+          body = r.json()
+          print('Success:', body.get('success'))
+          if not body.get('success'):
+              print('Errors:', body.get('errors'))
+              sys.exit(1)
+          print('Worker atualizado!')
+          EOF
