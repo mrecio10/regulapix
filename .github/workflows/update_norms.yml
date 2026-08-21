@@ -1,9 +1,9 @@
 name: Atualizar Normas do Pix
 
 on:
-  schedule:
-    - cron: '0 9 * * *'   # Todo dia às 9h UTC = 6h horário de Brasília
-  workflow_dispatch:       # Permite disparar manualmente pelo GitHub
+schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -36,92 +36,58 @@ jobs:
           git add regulapix.html
           git diff --staged --quiet \
             && echo "Sem mudanças para commitar." \
-            || (git commit -m "🔄 Normas atualizadas $(date +'%d/%m/%Y')" && git push)
+            || (git commit -m "Normas atualizadas $(date +'%d/%m/%Y')" && git push)
 
-      - name: Diagnosticar Workers na conta Cloudflare
-        run: |
-          python3 - << 'PYEOF'
-          import os, requests
-
-          account_id = os.environ['CLOUDFLARE_ACCOUNT_ID']
-          api_token  = os.environ['CLOUDFLARE_API_TOKEN']
-
-          headers = {'Authorization': f'Bearer {api_token}'}
-
-          # Listar todos os workers da conta
-          r = requests.get(
-              f'https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts',
-              headers=headers
-          )
-          print(f'HTTP: {r.status_code}')
-          body = r.json()
-          if body.get('success'):
-              workers = body.get('result', [])
-              print(f'Workers encontrados: {len(workers)}')
-              for w in workers:
-                  print(f'  - id: {w.get("id")} | etag: {w.get("etag", "")[:8]}')
-          else:
-              print('Erro:', body.get('errors'))
-          PYEOF
+      - name: Publicar no Cloudflare Worker
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Publicar HTML atualizado no Cloudflare Worker
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
         run: |
-          python3 - << 'PYEOF'
+          python3 -c "
           import os, sys, json, requests
 
-          account_id  = os.environ.get('CLOUDFLARE_ACCOUNT_ID', '')
-          api_token   = os.environ.get('CLOUDFLARE_API_TOKEN', '')
-          worker_name = 'regulapix'
+          account_id = os.environ.get('CLOUDFLARE_ACCOUNT_ID', '')
+          api_key    = os.environ.get('CLOUDFLARE_API_TOKEN', '')
+          email      = os.environ.get('CLOUDFLARE_EMAIL', '')
 
-          # Verificar se os secrets estão disponíveis
-          print('Account ID (primeiros 6):', account_id[:6] if account_id else 'VAZIO!')
-          print('API Token (primeiros 6):', api_token[:6] if api_token else 'VAZIO!')
+          print('Account ID (6):', account_id[:6])
+          print('API Key (6):', api_key[:6] if api_key else 'VAZIO')
+          print('Email (6):', email[:6] if email else 'VAZIO')
 
-          if not account_id or not api_token:
-              print('ERRO: Secrets CLOUDFLARE_ACCOUNT_ID ou CLOUDFLARE_API_TOKEN estao vazios.')
+          if not api_key or not account_id or not email:
+              print('ERRO: Secrets ausentes')
               sys.exit(1)
 
           with open('regulapix.html', 'r', encoding='utf-8') as f:
               html = f.read()
 
-          html_json = json.dumps(html)
-
-          # Service Worker format — compatível com upload direto como application/javascript
           worker_script = (
-              'addEventListener("fetch", event => {\n'
-              '  event.respondWith(handleRequest(event.request));\n'
-              '});\n\n'
-              'async function handleRequest(request) {\n'
-              '  const html = ' + html_json + ';\n'
-              '  return new Response(html, {\n'
-              '    headers: { "Content-Type": "text/html; charset=utf-8" }\n'
-              '  });\n'
+              'addEventListener(\"fetch\", event => {'
+              '  event.respondWith(handleRequest(event.request));'
+              '});'
+              'async function handleRequest(request) {'
+              '  const html = ' + json.dumps(html) + ';'
+              '  return new Response(html, {'
+              '    headers: {\"Content-Type\": \"text/html; charset=utf-8\"}'
+              '  });'
               '}'
           )
 
-          api_url = (
-              'https://api.cloudflare.com/client/v4/accounts/'
-              + account_id
-              + '/workers/scripts/'
-              + worker_name
-          )
+          url = ('https://api.cloudflare.com/client/v4/accounts/'
+                 + account_id + '/workers/scripts/regulapix')
 
-          print('Enviando', len(worker_script), 'bytes para', api_url[:60] + '...')
-
-          r = requests.put(
-              api_url,
+          # Autenticação com Global API Key (X-Auth-Email + X-Auth-Key)
+          r = requests.put(url,
               headers={
-                  'Authorization': 'Bearer ' + api_token,
+                  'X-Auth-Email': email,
+                  'X-Auth-Key': api_key,
                   'Content-Type': 'application/javascript',
               },
-              data=worker_script.encode('utf-8')
-          )
+              data=worker_script.encode('utf-8'))
 
-          print('HTTP status:', r.status_code)
-          print('Resposta:', r.text[:600])
+          print('HTTP:', r.status_code)
+          print('Resposta:', r.text[:400])
 
           body = r.json()
           if body.get('success'):
@@ -129,29 +95,4 @@ jobs:
           else:
               print('Falha:', body.get('errors'))
               sys.exit(1)
-          PYEOF
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Verificar se o site foi atualizado
-        run: |
-          python3 - << 'PYEOF'
-          import urllib.request, re, time
-
-          time.sleep(5)  # aguarda propagação
-
-          url = 'https://regulapix.msrecio1.workers.dev/regulapix'
-          print(f'Verificando {url}...')
-
-          try:
-              with urllib.request.urlopen(url, timeout=15) as r:
-                  html = r.read().decode('utf-8')
-              m = re.search(r"LAST_AUTO_UPDATE = '([^']+)'", html)
-              if m:
-                  print(f'✅ Data no site: {m.group(1)}')
-              else:
-                  print('⚠️  Data não encontrada no HTML retornado')
-          except Exception as e:
-              print(f'Erro ao verificar: {e}')
-          PYEOF
+          "
