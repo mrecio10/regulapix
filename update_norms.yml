@@ -80,6 +80,13 @@ jobs:
           print('Account ID (primeiros 6):', account_id[:6] if account_id else 'VAZIO!')
           print('API Token (primeiros 6):', api_token[:6] if api_token else 'VAZIO!')
 
+          # Listar TODAS as variáveis de ambiente que possam ser o token do Cloudflare
+          import os as _os
+          cf_vars = {k: v[:8] + '...' for k, v in _os.environ.items()
+                     if any(x in k.upper() for x in ['CLOUD', 'CF_', 'TOKEN', 'WORKER', 'API'])
+                     and v}
+          print('Variaveis possivelmente relacionadas:', cf_vars)
+
           if not account_id or not api_token:
               print('ERRO: Secrets CLOUDFLARE_ACCOUNT_ID ou CLOUDFLARE_API_TOKEN estao vazios.')
               sys.exit(1)
@@ -155,3 +162,4 @@ jobs:
           except Exception as e:
               print(f'Erro ao verificar: {e}')
           PYEOF
+
