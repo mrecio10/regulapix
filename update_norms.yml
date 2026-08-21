@@ -1,7 +1,7 @@
 name: Atualizar Normas do Pix
 
 on:
-  schedule:
+schedule:
     - cron: '0 9 * * *'
   workflow_dispatch:
 
